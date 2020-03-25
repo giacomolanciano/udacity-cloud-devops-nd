@@ -20,6 +20,9 @@ Resources:
         BlockPublicPolicy: FALSE
         IgnorePublicAcls: FALSE
         RestrictPublicBuckets: FALSE
+      WebsiteConfiguration:
+        ErrorDocument: "index.html"
+        IndexDocument: "index.html"
       Tags:
         - Key: Name
           Value: !Ref EnvironmentName
