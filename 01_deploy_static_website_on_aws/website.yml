@@ -50,3 +50,29 @@ Resources:
                 - - "arn:aws:s3:::"
                   - !Ref S3BucketName
                   - "/*"
+
+  CloudfrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          ForwardedValues:
+            QueryString: FALSE
+          TargetOriginId: !Join
+            - "-"
+            - - "s3"
+              - !Ref S3BucketName
+          ViewerProtocolPolicy: allow-all
+        Enabled: TRUE
+        Origins:
+          - DomainName: !GetAtt S3Bucket.DomainName
+            Id: !Join
+              - "-"
+              - - "s3"
+                - !Ref S3BucketName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        PriceClass: PriceClass_All
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
