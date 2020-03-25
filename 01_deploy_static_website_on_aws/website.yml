@@ -72,7 +72,6 @@ Resources:
                 - !Ref S3BucketName
             S3OriginConfig:
               OriginAccessIdentity: ""
-        PriceClass: PriceClass_All
       Tags:
         - Key: Name
           Value: !Ref EnvironmentName
