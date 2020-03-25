@@ -8,6 +8,10 @@ Parameters:
   S3BucketName:
     Description: A name for the S3 bucket that hosts the website
     Type: String
+  WebsiteIndexDocument:
+    Description: The name of the website's index document
+    Type: String
+    Default: "index.html"
 
 Resources:
   S3Bucket:
@@ -21,8 +25,8 @@ Resources:
         IgnorePublicAcls: FALSE
         RestrictPublicBuckets: FALSE
       WebsiteConfiguration:
-        ErrorDocument: "index.html"
-        IndexDocument: "index.html"
+        ErrorDocument: !Ref WebsiteIndexDocument
+        IndexDocument: !Ref WebsiteIndexDocument
       Tags:
         - Key: Name
           Value: !Ref EnvironmentName
