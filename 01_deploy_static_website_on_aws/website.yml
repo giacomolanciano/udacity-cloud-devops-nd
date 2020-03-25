@@ -76,3 +76,16 @@ Resources:
       Tags:
         - Key: Name
           Value: !Ref EnvironmentName
+
+Outputs:
+  WebsiteURL:
+    Description: The URL at which the website is accessible.
+    Value: !Join
+      - "/"
+      - - !GetAtt CloudfrontDistribution.DomainName
+        - !Ref WebsiteIndexDocument
+    Export:
+      Name: !Join
+        - ":"
+        - - !Ref "AWS::StackName"
+          - WebsiteURL
