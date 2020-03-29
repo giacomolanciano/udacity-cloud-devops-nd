@@ -2,24 +2,189 @@ Description: >
   This template deploys the resources required for project 2
 
 Parameters:
-# whatever you consider a changing value, put it as a parameter instead of hard-coding it into your script
+  EnvironmentName:
+    Description: The environment name that will be prefixed to resource names
+    Type: String
+
+  VpcCIDR:
+    Description: The IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  PrivateSubnet1CIDR:
+    Description: The IP range (CIDR notation) for the private subnet in the first available zone
+    Type: String
+    Default: 10.0.0.0/24
+
+  PrivateSubnet2CIDR:
+    Description: The IP range (CIDR notation) for the private subnet in the second available zone
+    Type: String
+    Default: 10.0.1.0/24
+
+  AppServerImageId:
+    Description: The AMI id for the application servers (default Ubuntu 18.04 LTS)
+    Type: String
+    Default: ami-0fc20dd1da406780b
+
+  AppServerInstanceType:
+    Description: The instance type for the application servers
+    Type: String
+    Default: t2.medium
+
+  AppServerDiskSize:
+    Description: The disk size for the application servers
+    Type: Number
+    Default: 10
+
+  AppServerKeyName:
+    Description: >
+      The (already existing) SSH key to be associated with application servers. If left empty, it will not be possible
+      to log directly into application servers.
+    Type: String
+
+  UdacityS3BucketName:
+    Description: The S3 bucket where to retrieve application server source code
+    Type: String
+    Default: udacity-demo-1
+
+Conditions:
+  KeyNameProvided: !Not [!Equals ["", !Ref AppServerKeyName]]
 
 Resources:
-  #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
-  ProfileWithRolesForOurApp:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      # MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true # TODO set to false after debugging
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      # MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true # TODO set to false after debugging
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+
+  AppServerSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to hosts and SSH from local only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  # Role for allowing an EC2 instance to read-only the contents of Udacity S3 Bucket.
+  UdacityS3ReadOnlyEC2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: UdacityS3ReadOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                Resource:
+                  - !Join
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - !Ref UdacityS3BucketName
+                      - "/udacity.zip"
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}
+
+  # instance profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
+  AppServerProfileWithRoles:
     Type: AWS::IAM::InstanceProfile
     Properties:
+      InstanceProfileName: !Sub ${EnvironmentName}-APP-SERVER-PROFILE
       Roles:
-        - UdacityS3ReadOnlyEC2
+        - !Ref UdacityS3ReadOnlyEC2
 
+  AppServerLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      UserData:
+        Fn::Base64: !Sub |
           #!/bin/bash
           apt-get update -y
           apt-get install unzip awscli -y
           apt-get install apache2 -y
           systemctl start apache2.service
           cd /var/www/html
-          aws s3 cp s3://udacity-demo-1/udacity.zip .
+          aws s3 cp s3://${UdacityS3BucketName}/udacity.zip .
           unzip -o udacity.zip
-
-Outputs:
-#Bonus points for useful outputs!
+      IamInstanceProfile: !Ref AppServerProfileWithRoles
+      ImageId: !Ref AppServerImageId
+      SecurityGroups:
+        - !Ref AppServerSecGroup
+      InstanceType: !Ref AppServerInstanceType
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdk"
+          Ebs:
+            VolumeSize: !Ref AppServerDiskSize
+      # add SSH key only if parameter is specified
+      KeyName: !If
+        - KeyNameProvided
+        - !Ref AppServerKeyName
+        - !Ref AWS::NoValue
+# Outputs:
+# Bonus points for useful outputs!
