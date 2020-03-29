@@ -11,13 +11,13 @@ Parameters:
     Type: String
     Default: 10.0.0.0/16
 
-  PrivateSubnet1CIDR:
-    Description: The IP range (CIDR notation) for the private subnet in the first available zone
+  PublicSubnet1CIDR:
+    Description: The IP range (CIDR notation) for the public subnet in the first available zone
     Type: String
     Default: 10.0.0.0/24
 
-  PrivateSubnet2CIDR:
-    Description: The IP range (CIDR notation) for the private subnet in the second available zone
+  PublicSubnet2CIDR:
+    Description: The IP range (CIDR notation) for the public subnet in the second available zone
     Type: String
     Default: 10.0.1.0/24
 
@@ -51,6 +51,7 @@ Conditions:
   KeyNameProvided: !Not [!Equals ["", !Ref AppServerKeyName]]
 
 Resources:
+  # create a VPC for the project
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -60,6 +61,7 @@ Resources:
         - Key: Name
           Value: !Ref EnvironmentName
 
+  # create an Internet Gateway for the VPC
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -73,29 +75,59 @@ Resources:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
 
-  PrivateSubnet1:
+  # create a route table for the VPC
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  # create a default route for the VPC, s.t. the traffic can flow from the Internet Gateway
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # create public subnets within VPC
+  PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [0, !GetAZs ""]
-      CidrBlock: !Ref PrivateSubnet1CIDR
-      # MapPublicIpOnLaunch: false
-      MapPublicIpOnLaunch: true # TODO set to false after debugging
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
 
-  PrivateSubnet2:
+  PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [1, !GetAZs ""]
-      CidrBlock: !Ref PrivateSubnet2CIDR
-      # MapPublicIpOnLaunch: false
-      MapPublicIpOnLaunch: true # TODO set to false after debugging
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+
+  # associate public subnets with VPC route table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
 
   AppServerSecGroup:
     Type: AWS::EC2::SecurityGroup
