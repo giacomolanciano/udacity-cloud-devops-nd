@@ -113,7 +113,7 @@ Resources:
           Name: !Ref AppServerProfileWithRoles
         ImageId: !Ref AppServerImageId
         InstanceType: !Ref AppServerInstanceType
-        SecurityGroups:
+        SecurityGroupIds:
           - !Ref AppServerSecGroup
         UserData:
           Fn::Base64: !Sub |
@@ -130,3 +130,23 @@ Resources:
           - KeyNameProvided
           - !Ref AppServerKeyName
           - !Ref AWS::NoValue
+
+  # create at autoscaling group of application servers spanning across the the AZs and deployed in the respective
+  # private subnets, not to be visible directly from outside the VPC
+  WebAppAutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${EnvironmentName}-Web-App-Group
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PRIV-NETS"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref AppServerLaunchTemplate
+        Version: !GetAtt AppServerLaunchTemplate.LatestVersionNumber
+      MinSize: "4"
+      MaxSize: "4"
+      # TargetGroupARNs:
+      #   - Ref: WebAppTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}
+          PropagateAtLaunch: true
