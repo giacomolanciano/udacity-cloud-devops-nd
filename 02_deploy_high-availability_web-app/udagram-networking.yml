@@ -64,7 +64,7 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  # create public subnets within VPC
+  # create public subnets within VPC, one for each AZ
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
