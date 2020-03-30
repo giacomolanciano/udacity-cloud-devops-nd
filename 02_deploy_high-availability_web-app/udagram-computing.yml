@@ -99,30 +99,34 @@ Resources:
       Roles:
         - !Ref UdacityS3ReadOnlyEC2
 
-  AppServerLaunchConfig:
-    Type: AWS::AutoScaling::LaunchConfiguration
+  # define a launch template for application servers
+  AppServerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
     Properties:
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          apt-get update -y
-          apt-get install unzip awscli -y
-          apt-get install apache2 -y
-          systemctl start apache2.service
-          cd /var/www/html
-          aws s3 cp s3://${UdacityS3BucketName}/udacity.zip .
-          unzip -o udacity.zip
-      IamInstanceProfile: !Ref AppServerProfileWithRoles
-      ImageId: !Ref AppServerImageId
-      SecurityGroups:
-        - !Ref AppServerSecGroup
-      InstanceType: !Ref AppServerInstanceType
-      BlockDeviceMappings:
-        - DeviceName: "/dev/sdk"
-          Ebs:
-            VolumeSize: !Ref AppServerDiskSize
-      # add SSH key only if parameter is non-empty
-      KeyName: !If
-        - KeyNameProvided
-        - !Ref AppServerKeyName
-        - !Ref AWS::NoValue
+      LaunchTemplateName: !Sub ${EnvironmentName}-App-Server-Template
+      LaunchTemplateData:
+        BlockDeviceMappings:
+          - DeviceName: "/dev/sdk"
+            Ebs:
+              VolumeSize: !Ref AppServerDiskSize
+        IamInstanceProfile:
+          Name: !Ref AppServerProfileWithRoles
+        ImageId: !Ref AppServerImageId
+        InstanceType: !Ref AppServerInstanceType
+        SecurityGroups:
+          - !Ref AppServerSecGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            apt-get update -y
+            apt-get install unzip awscli -y
+            apt-get install apache2 -y
+            systemctl start apache2.service
+            cd /var/www/html
+            aws s3 cp s3://${UdacityS3BucketName}/udacity.zip .
+            unzip -o udacity.zip
+        # add SSH key only if parameter is non-empty
+        KeyName: !If
+          - KeyNameProvided
+          - !Ref AppServerKeyName
+          - !Ref AWS::NoValue
