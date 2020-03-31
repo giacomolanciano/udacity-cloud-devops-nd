@@ -139,9 +139,88 @@ Resources:
         Version: !GetAtt AppServerLaunchTemplate.LatestVersionNumber
       MinSize: "4"
       MaxSize: "4"
-      # TargetGroupARNs:
-      #   - Ref: WebAppTargetGroup
+      TargetGroupARNs:
+        - !Ref WebAppTargetGroup
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}
           PropagateAtLaunch: true
+
+  # create a target group defining the logic to health-checking the web app through a load balancer. this will be
+  # associated with the autoscaling group, s.t. any instances belonging to the latter will be health-checked
+  WebAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-VPC"
+
+  # create a security group for the load balancer, allowing ingoing/outgoing requests through port 80
+  LBSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to load balancer
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPC"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  # create a load balancer
+  WebAppLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PUB-NET-1"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PUB-NET-2"
+      SecurityGroups:
+        - Ref: LBSecGroup
+
+  # define a load balancer listener to forward traffic coming from port 80 to the target group
+  LBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebAppTargetGroup
+      LoadBalancerArn:
+        Ref: WebAppLB
+      Port: 80
+      Protocol: HTTP
+
+  LBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref WebAppTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values: [/]
+      ListenerArn: !Ref LBListener
+      Priority: 1
+
+Outputs:
+  WebAppURL:
+    Description: The URL of the web app load balancer
+    Value: !Join
+      - ""
+      - - "http://"
+        - !GetAtt WebAppLB.DNSName
+    Export:
+      Name: !Sub ${EnvironmentName}-URL
