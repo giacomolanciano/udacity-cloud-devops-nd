@@ -36,6 +36,10 @@ Parameters:
     Description: The (already existing) SSH key to be associated with bastion host.
     Type: String
 
+  BastionHostAccessCIDR:
+    Description: The IP range (CIDR notation) that is allowed to SSH into bastion host.
+    Type: String
+
 Conditions:
   KeyNameProvided: !Not [!Equals ["", !Ref AppServerKeyName]]
 
@@ -230,7 +234,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref BastionHostAccessCIDR
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Bastion Host
