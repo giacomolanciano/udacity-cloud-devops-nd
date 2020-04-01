@@ -216,6 +216,16 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway2
 
+  # allocate elastic IPs for bastion host
+  BastionHostEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Bastion Host IP
+
 Outputs:
   VPC:
     Description: A reference to the project VPC
@@ -276,3 +286,9 @@ Outputs:
     Value: !Ref PrivateSubnet2
     Export:
       Name: !Sub ${EnvironmentName}-PRIV-NET-2
+
+  BastionHostEIP:
+    Description: A reference to the elastic IP allocated for bastion host
+    Value: !GetAtt BastionHostEIP.AllocationId
+    Export:
+      Name: !Sub ${EnvironmentName}-BH-IP

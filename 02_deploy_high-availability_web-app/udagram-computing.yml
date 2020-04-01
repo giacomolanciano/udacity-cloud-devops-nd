@@ -32,6 +32,11 @@ Parameters:
     Type: String
     Default: udacity-demo-1
 
+  BastionHostKeyName:
+    Description: >
+      The (already existing) SSH key to be associated with bastion host.
+    Type: String
+
 Conditions:
   KeyNameProvided: !Not [!Equals ["", !Ref AppServerKeyName]]
 
@@ -215,6 +220,43 @@ Resources:
       ListenerArn: !Ref LBListener
       Priority: 1
 
+  # create a bastion host to be able to SSH into app servers deployed in private subnets
+  BastionHostSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH from local only
+      VpcId:
+        Fn::ImportValue: !Sub ${EnvironmentName}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Bastion Host
+
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AppServerImageId
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref BastionHostSecGroup
+      SubnetId:
+        Fn::ImportValue: !Sub ${EnvironmentName}-PUB-NET-1
+      KeyName: !Ref BastionHostKeyName
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Bastion Host
+
+  BastionHostEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId:
+        Fn::ImportValue: !Sub ${EnvironmentName}-BH-IP
+      InstanceId: !Ref BastionHost
+
 Outputs:
   WebAppURL:
     Description: The URL of the web app load balancer
@@ -224,3 +266,9 @@ Outputs:
         - !GetAtt WebAppLB.DNSName
     Export:
       Name: !Sub ${EnvironmentName}-URL
+
+  BastionHostDNSName:
+    Description: The DNS name of the bastion host
+    Value: !GetAtt BastionHost.PublicDnsName
+    Export:
+      Name: !Sub ${EnvironmentName}-BH-DNS
