@@ -102,7 +102,8 @@ Resources:
       Roles:
         - !Ref UdacityS3ReadOnlyEC2
 
-  # define a launch template for application servers
+  # define a launch template for application servers (NOTE: as per AWS docs, usage of LaunchTemplate is recommended
+  # over usage of LaunchConfiguration)
   AppServerLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
