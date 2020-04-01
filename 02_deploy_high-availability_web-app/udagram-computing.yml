@@ -149,6 +149,8 @@ Resources:
       MaxSize: "4"
       TargetGroupARNs:
         - !Ref WebAppTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 180
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}
