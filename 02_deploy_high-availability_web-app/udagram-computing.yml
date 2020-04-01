@@ -33,8 +33,7 @@ Parameters:
     Default: udacity-demo-1
 
   BastionHostKeyName:
-    Description: >
-      The (already existing) SSH key to be associated with bastion host.
+    Description: The (already existing) SSH key to be associated with bastion host.
     Type: String
 
 Conditions:
