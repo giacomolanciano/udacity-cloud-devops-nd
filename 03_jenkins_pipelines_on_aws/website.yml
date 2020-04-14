@@ -1,0 +1,62 @@
+Description: >
+  This template deploys the resources required for project 3
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  S3BucketName:
+    Description: A name for the S3 bucket that hosts the website
+    Type: String
+  WebsiteIndexDocument:
+    Description: The name of the website's index document
+    Type: String
+    Default: "index.html"
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref S3BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: FALSE
+        BlockPublicPolicy: FALSE
+        IgnorePublicAcls: FALSE
+        RestrictPublicBuckets: FALSE
+      WebsiteConfiguration:
+        ErrorDocument: !Ref WebsiteIndexDocument
+        IndexDocument: !Ref WebsiteIndexDocument
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: S3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "PublicReadGetObject"
+            Effect: "Allow"
+            Principal: "*"
+            Action:
+              - "s3:GetObject"
+            Resource:
+              - !Join
+                - ""
+                - - "arn:aws:s3:::"
+                  - !Ref S3BucketName
+                  - "/*"
+
+Outputs:
+  WebsiteURL:
+    Description: The URL at which the website is accessible.
+    Value: !GetAtt S3Bucket.WebsiteURL
+    Export:
+      Name: !Join
+        - ":"
+        - - !Ref "AWS::StackName"
+          - WebsiteURL
