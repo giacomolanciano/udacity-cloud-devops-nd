@@ -1,0 +1,13 @@
+name: udacity-cloud-nd
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python==3.6.10
+  - wikipedia
+  - mypy
+  - pylint
+  - autopep8
+  - pip
+  - pip:
+      - chalice==1.13.1
