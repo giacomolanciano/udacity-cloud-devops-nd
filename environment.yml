@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python==3.6.10
   - jupyter
+  - jupytext
   - wikipedia
   - pytest
   - pytest-mock
